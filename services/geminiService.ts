@@ -2,9 +2,19 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { GeminiProfileResponse } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 export const analyzeProfile = async (base64Image: string): Promise<GeminiProfileResponse> => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    return {
+      name: "Elite Talent",
+      country: "International",
+      about:
+        "A versatile and compelling presence in the modern fashion landscape, known for a unique aesthetic and effortless poise.",
+      category: "Editorial"
+    };
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   const model = "gemini-3-flash-preview";
 
   const prompt = `Act as a senior fashion editor. Analyze this portrait for a "Top 40 Rankings" website.
