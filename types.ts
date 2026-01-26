@@ -6,6 +6,7 @@ export interface Profile {
   about: string;
   category: string;
   profileImage: string;
+  galleryImages: string[];
   views: number;
   rank: number;
   uploadedAt: number;

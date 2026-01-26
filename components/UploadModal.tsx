@@ -4,28 +4,31 @@ import React, { useState, useRef } from 'react';
 interface UploadModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onUpload: (file: File) => void;
+  onUpload: (files: File[]) => void;
   isAnalyzing: boolean;
 }
 
 const UploadModal: React.FC<UploadModalProps> = ({ onClose, onUpload, isAnalyzing }) => {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => setPreview(reader.result as string);
-      reader.readAsDataURL(file);
-    }
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setSelectedFiles(files);
+    Promise.all(
+      files.map(file => new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      }))
+    ).then(results => setPreviews(results));
   };
 
   const handleConfirm = () => {
-    if (selectedFile) {
-      onUpload(selectedFile);
+    if (selectedFiles.length > 0) {
+      onUpload(selectedFiles);
     }
   };
 
@@ -46,7 +49,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onUpload, isAnalyzin
           </button>
         </div>
 
-        {!preview ? (
+        {previews.length === 0 ? (
           <div 
             onClick={() => fileInputRef.current?.click()}
             className="border-2 border-dashed border-gray-100 rounded-[2rem] p-16 flex flex-col items-center justify-center cursor-pointer hover:border-black hover:bg-gray-50 transition-all group"
@@ -63,13 +66,14 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onUpload, isAnalyzin
               className="hidden" 
               ref={fileInputRef} 
               accept="image/*" 
+              multiple
               onChange={handleFileChange}
             />
           </div>
         ) : (
           <div className="space-y-8">
             <div className="aspect-[3/4] rounded-[2rem] overflow-hidden bg-gray-50 border border-gray-100 shadow-inner relative">
-              <img src={preview} alt="Preview" className="w-full h-full object-cover" />
+              <img src={previews[0]} alt="Preview" className="w-full h-full object-cover" />
               {isAnalyzing && (
                 <div className="absolute inset-0 bg-white/80 backdrop-blur-md flex flex-col items-center justify-center text-black p-10 text-center">
                    <div className="w-12 h-12 border-2 border-black border-t-transparent rounded-full animate-spin mb-6"></div>
@@ -77,10 +81,25 @@ const UploadModal: React.FC<UploadModalProps> = ({ onClose, onUpload, isAnalyzin
                 </div>
               )}
             </div>
+
+            {previews.length > 1 && (
+              <div className="grid grid-cols-5 gap-2">
+                {previews.slice(0, 5).map((preview, idx) => (
+                  <div key={`${preview}-${idx}`} className="aspect-square rounded-xl overflow-hidden border border-gray-100">
+                    <img src={preview} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" />
+                  </div>
+                ))}
+                {previews.length > 5 && (
+                  <div className="aspect-square rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">+{previews.length - 5}</span>
+                  </div>
+                )}
+              </div>
+            )}
             
             <div className="flex gap-4">
               <button 
-                onClick={() => { setPreview(null); setSelectedFile(null); }}
+                onClick={() => { setPreviews([]); setSelectedFiles([]); }}
                 className="flex-1 py-4 text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:text-black transition-colors"
                 disabled={isAnalyzing}
               >

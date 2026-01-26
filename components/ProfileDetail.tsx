@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Profile } from '../types';
 
 interface ProfileDetailProps {
@@ -7,9 +7,24 @@ interface ProfileDetailProps {
   isAdmin: boolean;
   onClose: () => void;
   onDelete: () => void;
+  onAddImages: (files: File[]) => void;
 }
 
-const ProfileDetail: React.FC<ProfileDetailProps> = ({ profile, isAdmin, onClose, onDelete }) => {
+const ProfileDetail: React.FC<ProfileDetailProps> = ({ profile, isAdmin, onClose, onDelete, onAddImages }) => {
+  const addImagesInputRef = useRef<HTMLInputElement>(null);
+  const galleryImages = useMemo(() => {
+    if (profile.galleryImages && profile.galleryImages.length > 0) {
+      return profile.galleryImages;
+    }
+    return profile.profileImage ? [profile.profileImage] : [];
+  }, [profile.galleryImages, profile.profileImage]);
+
+  const [activeImage, setActiveImage] = useState<string>(profile.profileImage);
+
+  useEffect(() => {
+    setActiveImage(galleryImages[0] || profile.profileImage);
+  }, [galleryImages, profile.profileImage]);
+
   // Enhanced SEO Injection: Update title, description, keywords, and OG tags
   useEffect(() => {
     const originalTitle = document.title;
@@ -126,12 +141,50 @@ const ProfileDetail: React.FC<ProfileDetailProps> = ({ profile, isAdmin, onClose
             <div className="sticky top-32">
               <div className="aspect-[3/4] rounded-[2.5rem] overflow-hidden shadow-2xl bg-gray-50 border border-gray-100 group">
                 <img 
-                  src={profile.profileImage} 
+                  src={activeImage} 
                   alt={`${profile.name} - Professional Model from ${profile.country}`} 
                   className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
                   loading="eager"
                 />
               </div>
+              {galleryImages.length > 1 && (
+                <div className="mt-6 grid grid-cols-5 gap-2">
+                  {galleryImages.map((image, idx) => (
+                    <button
+                      key={`${profile.id}-thumb-${idx}`}
+                      onClick={() => setActiveImage(image)}
+                      className={`aspect-square rounded-2xl overflow-hidden border transition-all ${
+                        activeImage === image ? 'border-black shadow-lg' : 'border-gray-100 hover:border-gray-300'
+                      }`}
+                      aria-label={`View image ${idx + 1} of ${profile.name}`}
+                    >
+                      <img src={image} alt={`${profile.name} gallery ${idx + 1}`} className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
+              {isAdmin && (
+                <div className="mt-6">
+                  <button
+                    onClick={() => addImagesInputRef.current?.click()}
+                    className="px-6 py-3 border border-gray-200 text-[10px] font-bold uppercase tracking-[0.3em] rounded-full hover:border-black hover:text-black transition-all"
+                  >
+                    Add Photos
+                  </button>
+                  <input
+                    ref={addImagesInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      if (files.length > 0) onAddImages(files);
+                      if (addImagesInputRef.current) addImagesInputRef.current.value = '';
+                    }}
+                  />
+                </div>
+              )}
               <div className="mt-8 flex justify-between items-center text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em]">
                 <span>Full Portfolio View</span>
                 <span>Archive Ref: {profile.id.slice(0, 8)}</span>

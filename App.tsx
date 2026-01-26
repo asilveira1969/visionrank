@@ -25,7 +25,16 @@ const App: React.FC = () => {
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (saved) {
       try {
-        setProfiles(JSON.parse(saved));
+        const parsed = JSON.parse(saved) as Profile[];
+        const normalized = parsed.map((profile) => ({
+          ...profile,
+          galleryImages: profile.galleryImages && profile.galleryImages.length > 0
+            ? profile.galleryImages
+            : profile.profileImage
+              ? [profile.profileImage]
+              : []
+        }));
+        setProfiles(normalized);
       } catch (e) {
         console.error("Failed to parse storage", e);
       }
@@ -66,33 +75,40 @@ const App: React.FC = () => {
     }));
   }, [profiles]);
 
-  const handleUpload = async (file: File) => {
-    if (!isAdmin) return;
-    
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-      const base64 = reader.result as string;
-      setIsRefreshing(true);
-      
-      const analysis = await analyzeProfile(base64);
-      
-      const newProfile: Profile = {
-        id: crypto.randomUUID(),
-        profileImage: base64,
-        name: analysis.name,
-        country: analysis.country,
-        about: analysis.about,
-        category: analysis.category,
-        views: Math.floor(Math.random() * 20),
-        rank: profiles.length + 1,
-        uploadedAt: Date.now()
-      };
+  const readFileAsDataURL = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.readAsDataURL(file);
+    });
+  };
 
-      setProfiles(prev => [newProfile, ...prev]);
-      setIsRefreshing(false);
-      setIsUploadOpen(false);
+  const handleUpload = async (files: File[]) => {
+    if (!isAdmin) return;
+    if (files.length === 0) return;
+
+    setIsRefreshing(true);
+    const images = await Promise.all(files.map(readFileAsDataURL));
+    const primaryImage = images[0];
+
+    const analysis = await analyzeProfile(primaryImage);
+    
+    const newProfile: Profile = {
+      id: crypto.randomUUID(),
+      profileImage: primaryImage,
+      galleryImages: images,
+      name: analysis.name,
+      country: analysis.country,
+      about: analysis.about,
+      category: analysis.category,
+      views: Math.floor(Math.random() * 20),
+      rank: profiles.length + 1,
+      uploadedAt: Date.now()
     };
-    reader.readAsDataURL(file);
+
+    setProfiles(prev => [newProfile, ...prev]);
+    setIsRefreshing(false);
+    setIsUploadOpen(false);
   };
 
   const handleSelectProfile = (id: string) => {
@@ -109,6 +125,20 @@ const App: React.FC = () => {
       setProfiles(prev => prev.filter(p => p.id !== id));
       setSelectedProfile(null);
     }
+  };
+
+  const handleAddImages = async (id: string, files: File[]) => {
+    if (!isAdmin || files.length === 0) return;
+    const images = await Promise.all(files.map(readFileAsDataURL));
+    setProfiles(prev => prev.map(profile => {
+      if (profile.id !== id) return profile;
+      const nextGallery = [...(profile.galleryImages || []), ...images];
+      return {
+        ...profile,
+        profileImage: profile.profileImage || images[0],
+        galleryImages: nextGallery
+      };
+    }));
   };
 
   return (
@@ -179,6 +209,7 @@ const App: React.FC = () => {
           isAdmin={isAdmin}
           onClose={() => setSelectedProfile(null)}
           onDelete={() => handleDelete(selectedProfile.id)}
+          onAddImages={(files) => handleAddImages(selectedProfile.id, files)}
         />
       )}
 
