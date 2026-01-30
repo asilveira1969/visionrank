@@ -1,0 +1,70 @@
+# Descripción del proyecto
+
+Este proyecto documenta y estructura mi proceso de aprendizaje y ejecución para crear websites profesionales, utilizando un stack moderno apoyado en IA y herramientas de desarrollo reales, con foco en criterio, orden, escalabilidad y SEO.
+
+El objetivo no es solo “hacer sitios que funcionen”, sino entender cómo se construyen correctamente, cómo se toman decisiones técnicas y cómo se evita el desorden típico del desarrollo asistido por IA.
+
+Este marco metodológico se aplica de forma práctica en el desarrollo de **VisionRank**, que funciona como proyecto principal y laboratorio real de aprendizaje.
+
+---
+
+## Enfoque
+
+El proyecto se basa en una separación clara de roles:
+
+- **Pensamiento estratégico, arquitectura, SEO y UX**: definidos previamente, fuera del editor.
+- **Ejecución técnica**: realizada en VS Code con asistencia de IA (Codex / Copilot), siguiendo instrucciones claras y controladas.
+
+Este enfoque permite mantener control total del proyecto, reducir retrabajo y asegurar una evolución ordenada del sitio.
+
+---
+
+## Stack y herramientas
+
+- VS Code  
+- GitHub  
+- Codex (IA dentro de VS Code)  
+- ChatGPT como apoyo estratégico  
+- HTML, CSS y JavaScript  
+- Enfoque SEO-first  
+
+---
+
+## Metodología de trabajo
+
+Antes de cada cambio se aplica un protocolo simple:
+
+1. Definir si la tarea es decisión o ejecución  
+2. Evaluar impacto en estructura, SEO y UX  
+3. Ejecutar solo con instrucciones claras  
+
+La IA se utiliza como herramienta de precisión, no como sustituto del criterio.
+
+---
+
+## VisionRank — Concepto del sitio
+
+VisionRank es un sitio web de **ranking visual enfocado en perfiles de modelos**.  
+El ranking se determina principalmente por la **cantidad de vistas reales** que recibe cada perfil, impulsando una competencia orgánica basada en el interés genuino del público, sin votaciones artificiales ni intervención manual.
+
+El proyecto está diseñado para crecer de forma progresiva: a medida que el sitio gane tracción, se incorporará más información por perfil, nuevas funcionalidades, más perfiles y mejoras continuas en la experiencia general.
+
+---
+
+## Funcionalidades actuales de VisionRank
+
+Actualmente, VisionRank permite:
+
+- Mostrar un archivo visual de perfiles con ranking dinámico basado en vistas.
+- Visualizar un panel de “Top 10” con los perfiles más vistos.
+- Acceder al detalle de cada perfil, incrementando automáticamente su conteo de vistas al visitarlo.
+- Subir nuevos perfiles mediante un modo administrador.
+- Analizar automáticamente información básica del perfil con IA para completar datos iniciales.
+
+---
+
+## Objetivo del proyecto
+
+Desarrollar la capacidad de crear websites desde cero con control total, estructura limpia, escalabilidad y buena visibilidad orgánica, usando la IA de forma profesional.
+
+En el caso de VisionRank, el objetivo es evolucionar hacia una **plataforma de curaduría visual cada vez más completa**, donde el posicionamiento de cada perfil esté guiado por el engagement real del público y el catálogo crezca de manera ordenada y sostenible en el tiempo.

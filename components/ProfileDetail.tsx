@@ -1,5 +1,5 @@
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Profile } from '../types';
 
 interface ProfileDetailProps {
@@ -12,18 +12,14 @@ interface ProfileDetailProps {
 
 const ProfileDetail: React.FC<ProfileDetailProps> = ({ profile, isAdmin, onClose, onDelete, onAddImages }) => {
   const addImagesInputRef = useRef<HTMLInputElement>(null);
-  const galleryImages = useMemo(() => {
-    if (profile.galleryImages && profile.galleryImages.length > 0) {
-      return profile.galleryImages;
-    }
-    return profile.profileImage ? [profile.profileImage] : [];
+  const additionalImages = useMemo(() => {
+    const galleryImages = profile.galleryImages || [];
+    if (galleryImages.length === 0) return [];
+    if (!profile.profileImage) return galleryImages;
+    const firstIndex = galleryImages.indexOf(profile.profileImage);
+    if (firstIndex === -1) return galleryImages;
+    return galleryImages.filter((_, idx) => idx !== firstIndex);
   }, [profile.galleryImages, profile.profileImage]);
-
-  const [activeImage, setActiveImage] = useState<string>(profile.profileImage);
-
-  useEffect(() => {
-    setActiveImage(galleryImages[0] || profile.profileImage);
-  }, [galleryImages, profile.profileImage]);
 
   // Enhanced SEO Injection: Update title, description, keywords, and OG tags
   useEffect(() => {
@@ -138,29 +134,15 @@ const ProfileDetail: React.FC<ProfileDetailProps> = ({ profile, isAdmin, onClose
           
           {/* Portrait Column */}
           <div className="lg:col-span-6">
-            <div className="sticky top-32">
-              <div className="aspect-[3/4] rounded-[2.5rem] overflow-hidden shadow-2xl bg-gray-50 border border-gray-100 group">
-                <img 
-                  src={activeImage} 
-                  alt={`${profile.name} - Professional Model from ${profile.country}`} 
-                  className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
-                  loading="eager"
-                />
-              </div>
-              {galleryImages.length > 1 && (
-                <div className="mt-6 grid grid-cols-5 gap-2">
-                  {galleryImages.map((image, idx) => (
-                    <button
-                      key={`${profile.id}-thumb-${idx}`}
-                      onClick={() => setActiveImage(image)}
-                      className={`aspect-square rounded-2xl overflow-hidden border transition-all ${
-                        activeImage === image ? 'border-black shadow-lg' : 'border-gray-100 hover:border-gray-300'
-                      }`}
-                      aria-label={`View image ${idx + 1} of ${profile.name}`}
-                    >
-                      <img src={image} alt={`${profile.name} gallery ${idx + 1}`} className="w-full h-full object-cover" />
-                    </button>
-                  ))}
+            <div className="max-w-3xl mx-auto">
+              {profile.profileImage && (
+                <div className="aspect-[3/4] rounded-[2.5rem] overflow-hidden shadow-2xl bg-gray-50 border border-gray-100 group">
+                  <img 
+                    src={profile.profileImage} 
+                    alt={`${profile.name} - Professional Model from ${profile.country}`} 
+                    className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
+                    loading="lazy"
+                  />
                 </div>
               )}
               {isAdmin && (
@@ -234,6 +216,24 @@ const ProfileDetail: React.FC<ProfileDetailProps> = ({ profile, isAdmin, onClose
                 </div>
               )}
             </div>
+          </div>
+        </div>
+
+        <div className="mt-12">
+          <div className="max-w-5xl mx-auto mt-6 space-y-6">
+            {additionalImages.length > 0 ? (
+              additionalImages.map((image, idx) => (
+                <img
+                  key={`${profile.id}-full-${idx}`}
+                  src={image}
+                  alt={`${profile.name} ${idx + 1}`}
+                  className="w-full h-auto rounded-xl"
+                  loading="lazy"
+                />
+              ))
+            ) : (
+              <p className="text-sm text-gray-400 italic text-center">No hay fotos adicionales</p>
+            )}
           </div>
         </div>
       </div>
