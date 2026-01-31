@@ -20,6 +20,7 @@ const App: React.FC = () => {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -44,11 +45,13 @@ const App: React.FC = () => {
     if (adminStatus === 'true') {
       setIsAdmin(true);
     }
+    setHasLoaded(true);
   }, []);
 
   useEffect(() => {
+    if (!hasLoaded) return;
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(profiles));
-  }, [profiles]);
+  }, [profiles, hasLoaded]);
 
   const handleAdminLogin = (password: string): boolean => {
     if (password === 'admin') {
