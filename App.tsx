@@ -50,7 +50,16 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (!hasLoaded) return;
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(profiles));
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(profiles));
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+        console.warn('LocalStorage quota exceeded. Latest changes were not saved.');
+        alert('El almacenamiento del navegador está lleno. Reduce la cantidad de imágenes o su tamaño.');
+      } else {
+        console.error('Failed to save to localStorage', error);
+      }
+    }
   }, [profiles, hasLoaded]);
 
   const handleAdminLogin = (password: string): boolean => {
@@ -79,11 +88,40 @@ const App: React.FC = () => {
   }, [profiles]);
 
   const readFileAsDataURL = (file: File): Promise<string> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(file);
     });
+  };
+
+  const compressImage = async (file: File): Promise<string> => {
+    const dataUrl = await readFileAsDataURL(file);
+    const img = new Image();
+    const imageLoaded = new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('Failed to load image'));
+    });
+    img.src = dataUrl;
+    await imageLoaded;
+
+    const maxSize = 1600;
+    let width = img.width;
+    let height = img.height;
+    if (width > maxSize || height > maxSize) {
+      const scale = Math.min(maxSize / width, maxSize / height);
+      width = Math.round(width * scale);
+      height = Math.round(height * scale);
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return dataUrl;
+    ctx.drawImage(img, 0, 0, width, height);
+    return canvas.toDataURL('image/jpeg', 0.78);
   };
 
   const handleUpload = async (files: File[]) => {
@@ -91,7 +129,7 @@ const App: React.FC = () => {
     if (files.length === 0) return;
 
     setIsRefreshing(true);
-    const images = await Promise.all(files.map(readFileAsDataURL));
+    const images = await Promise.all(files.map(compressImage));
     const primaryImage = images[0];
 
     const analysis = await analyzeProfile(primaryImage);
@@ -132,7 +170,7 @@ const App: React.FC = () => {
 
   const handleAddImages = async (id: string, files: File[]) => {
     if (!isAdmin || files.length === 0) return;
-    const images = await Promise.all(files.map(readFileAsDataURL));
+    const images = await Promise.all(files.map(compressImage));
     setProfiles(prev => prev.map(profile => {
       if (profile.id !== id) return profile;
       const nextGallery = [...(profile.galleryImages || []), ...images];
