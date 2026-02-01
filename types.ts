@@ -5,6 +5,9 @@ export interface Profile {
   country: string;
   about: string;
   category: string;
+  instagram?: string;
+  x?: string;
+  facebook?: string;
   profileImage: string;
   galleryImages: string[];
   views: number;

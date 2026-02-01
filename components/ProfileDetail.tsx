@@ -1,5 +1,5 @@
 
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Profile } from '../types';
 
 interface ProfileDetailProps {
@@ -8,10 +8,20 @@ interface ProfileDetailProps {
   onClose: () => void;
   onDelete: () => void;
   onAddImages: (files: File[]) => void;
+  onUpdate: (updates: Partial<Profile>) => void;
+  onRemoveImage: (imageUrl: string) => void;
 }
 
-const ProfileDetail: React.FC<ProfileDetailProps> = ({ profile, isAdmin, onClose, onDelete, onAddImages }) => {
+const ProfileDetail: React.FC<ProfileDetailProps> = ({ profile, isAdmin, onClose, onDelete, onAddImages, onUpdate, onRemoveImage }) => {
   const addImagesInputRef = useRef<HTMLInputElement>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState(profile.name);
+  const [editCountry, setEditCountry] = useState(profile.country);
+  const [editAbout, setEditAbout] = useState(profile.about);
+  const [editCategory, setEditCategory] = useState(profile.category);
+  const [editInstagram, setEditInstagram] = useState(profile.instagram || '');
+  const [editX, setEditX] = useState(profile.x || '');
+  const [editFacebook, setEditFacebook] = useState(profile.facebook || '');
   const additionalImages = useMemo(() => {
     const galleryImages = profile.galleryImages || [];
     if (galleryImages.length === 0) return [];
@@ -53,6 +63,7 @@ const ProfileDetail: React.FC<ProfileDetailProps> = ({ profile, isAdmin, onClose
     const profileDesc = `Explore the professional profile of ${profile.name} from ${profile.country}. Currently ranked #${profile.rank} with ${profile.views.toLocaleString()} views on VisionRank. ${profile.about}`;
     const profileKeywords = `${profile.name}, ${profile.country} models, fashion model ${profile.name}, VisionRank top 40, ${profile.category} models`;
     const profileUrl = `${window.location.origin}/profile/${profile.id}`;
+    const sameAs = [profile.instagram, profile.x, profile.facebook].filter(Boolean);
 
     // Update tags
     document.title = profileTitle;
@@ -83,6 +94,7 @@ const ProfileDetail: React.FC<ProfileDetailProps> = ({ profile, isAdmin, onClose
       "jobTitle": "Fashion Model",
       "url": profileUrl,
       "award": `VisionRank Global Ranking No. ${profile.rank}`,
+      ...(sameAs.length > 0 ? { "sameAs": sameAs } : {}),
       "interactionStatistic": {
         "@type": "InteractionCounter",
         "interactionType": "https://schema.org/WatchAction",
@@ -107,6 +119,29 @@ const ProfileDetail: React.FC<ProfileDetailProps> = ({ profile, isAdmin, onClose
       document.getElementById('profile-ld-json')?.remove();
     };
   }, [profile]);
+
+  useEffect(() => {
+    setEditName(profile.name);
+    setEditCountry(profile.country);
+    setEditAbout(profile.about);
+    setEditCategory(profile.category);
+    setEditInstagram(profile.instagram || '');
+    setEditX(profile.x || '');
+    setEditFacebook(profile.facebook || '');
+  }, [profile]);
+
+  const handleSave = () => {
+    onUpdate({
+      name: editName.trim(),
+      country: editCountry.trim(),
+      about: editAbout.trim(),
+      category: editCategory.trim(),
+      instagram: editInstagram.trim() || undefined,
+      x: editX.trim() || undefined,
+      facebook: editFacebook.trim() || undefined
+    });
+    setIsEditing(false);
+  };
 
   return (
     <div className="fixed inset-0 z-[100] bg-white overflow-y-auto animate-in fade-in slide-in-from-bottom-10 duration-500">
@@ -193,6 +228,123 @@ const ProfileDetail: React.FC<ProfileDetailProps> = ({ profile, isAdmin, onClose
                   {profile.about}
                 </p>
               </div>
+              {isAdmin && isEditing && (
+                <div className="space-y-4 border border-gray-100 rounded-[2rem] p-6">
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Nombre</label>
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full px-4 py-3 rounded-2xl border border-gray-100 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black/10"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">País</label>
+                    <input
+                      type="text"
+                      value={editCountry}
+                      onChange={(e) => setEditCountry(e.target.value)}
+                      className="w-full px-4 py-3 rounded-2xl border border-gray-100 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black/10"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Descripción</label>
+                    <textarea
+                      value={editAbout}
+                      onChange={(e) => setEditAbout(e.target.value)}
+                      className="w-full min-h-[90px] px-4 py-3 rounded-2xl border border-gray-100 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black/10"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Categoría</label>
+                    <input
+                      type="text"
+                      value={editCategory}
+                      onChange={(e) => setEditCategory(e.target.value)}
+                      className="w-full px-4 py-3 rounded-2xl border border-gray-100 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black/10"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Instagram</label>
+                    <input
+                      type="url"
+                      value={editInstagram}
+                      onChange={(e) => setEditInstagram(e.target.value)}
+                      className="w-full px-4 py-3 rounded-2xl border border-gray-100 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black/10"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">X</label>
+                    <input
+                      type="url"
+                      value={editX}
+                      onChange={(e) => setEditX(e.target.value)}
+                      className="w-full px-4 py-3 rounded-2xl border border-gray-100 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black/10"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Facebook</label>
+                    <input
+                      type="url"
+                      value={editFacebook}
+                      onChange={(e) => setEditFacebook(e.target.value)}
+                      className="w-full px-4 py-3 rounded-2xl border border-gray-100 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-black/10"
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setIsEditing(false)}
+                      className="flex-1 py-3 text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:text-black transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleSave}
+                      className="flex-[2] py-3 bg-black text-white text-[10px] font-bold uppercase tracking-[0.2em] rounded-full hover:bg-gray-800 transition-all"
+                    >
+                      Guardar Cambios
+                    </button>
+                  </div>
+                </div>
+              )}
+              {(profile.instagram || profile.x || profile.facebook) && (
+                <div className="space-y-4">
+                  <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.3em]">Social Links</h3>
+                  <div className="flex flex-wrap gap-3">
+                    {profile.instagram && (
+                      <a
+                        href={profile.instagram}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2 border border-gray-200 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500 hover:text-black hover:border-black transition-colors"
+                      >
+                        Instagram
+                      </a>
+                    )}
+                    {profile.x && (
+                      <a
+                        href={profile.x}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2 border border-gray-200 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500 hover:text-black hover:border-black transition-colors"
+                      >
+                        X
+                      </a>
+                    )}
+                    {profile.facebook && (
+                      <a
+                        href={profile.facebook}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2 border border-gray-200 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] text-gray-500 hover:text-black hover:border-black transition-colors"
+                      >
+                        Facebook
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-6 pt-8">
                 <div className="p-8 bg-gray-50 rounded-[2rem] border border-gray-100">
@@ -206,7 +358,13 @@ const ProfileDetail: React.FC<ProfileDetailProps> = ({ profile, isAdmin, onClose
               </div>
 
               {isAdmin && (
-                <div className="pt-12">
+                <div className="pt-12 space-y-4">
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="w-full py-5 border border-gray-200 text-gray-500 hover:text-black hover:border-black text-[10px] font-bold uppercase tracking-[0.3em] rounded-full transition-all"
+                  >
+                    Editar Perfil
+                  </button>
                   <button 
                     onClick={onDelete}
                     className="w-full py-5 border border-red-100 text-red-400 hover:bg-red-50 text-[10px] font-bold uppercase tracking-[0.3em] rounded-full transition-all"
@@ -223,13 +381,22 @@ const ProfileDetail: React.FC<ProfileDetailProps> = ({ profile, isAdmin, onClose
           <div className="max-w-5xl mx-auto mt-6 space-y-6">
             {additionalImages.length > 0 ? (
               additionalImages.map((image, idx) => (
-                <img
-                  key={`${profile.id}-full-${idx}`}
-                  src={image}
-                  alt={`${profile.name} ${idx + 1}`}
-                  className="w-full h-auto rounded-xl"
-                  loading="lazy"
-                />
+                <div key={`${profile.id}-full-${idx}`} className="relative">
+                  {isAdmin && (
+                    <button
+                      onClick={() => onRemoveImage(image)}
+                      className="absolute top-3 right-3 z-10 px-3 py-2 bg-white/90 text-[9px] font-bold uppercase tracking-widest text-gray-500 rounded-full border border-gray-100 hover:text-black hover:border-black transition-colors"
+                    >
+                      Remove
+                    </button>
+                  )}
+                  <img
+                    src={image}
+                    alt={`${profile.name} ${idx + 1}`}
+                    className="w-full h-auto rounded-xl"
+                    loading="lazy"
+                  />
+                </div>
               ))
             ) : (
               <p className="text-sm text-gray-400 italic text-center">No hay fotos adicionales</p>

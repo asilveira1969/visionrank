@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { analyzeProfile } from './services/geminiService';
 import { Profile } from './types';
 import Header from './components/Header';
 import Hero from './components/Hero';
@@ -124,24 +123,25 @@ const App: React.FC = () => {
     return canvas.toDataURL('image/jpeg', 0.78);
   };
 
-  const handleUpload = async (files: File[]) => {
+  const handleUpload = async (files: File[], details: { name: string; country: string; about: string; category: string; instagram?: string; x?: string; facebook?: string }) => {
     if (!isAdmin) return;
     if (files.length === 0) return;
 
     setIsRefreshing(true);
     const images = await Promise.all(files.map(compressImage));
     const primaryImage = images[0];
-
-    const analysis = await analyzeProfile(primaryImage);
     
     const newProfile: Profile = {
       id: crypto.randomUUID(),
       profileImage: primaryImage,
       galleryImages: images,
-      name: analysis.name,
-      country: analysis.country,
-      about: analysis.about,
-      category: analysis.category,
+      name: details.name,
+      country: details.country,
+      about: details.about,
+      category: details.category,
+      instagram: details.instagram,
+      x: details.x,
+      facebook: details.facebook,
       views: Math.floor(Math.random() * 20),
       rank: profiles.length + 1,
       uploadedAt: Date.now()
@@ -180,6 +180,42 @@ const App: React.FC = () => {
         galleryImages: nextGallery
       };
     }));
+  };
+
+  const handleUpdateProfile = (id: string, updates: Partial<Profile>) => {
+    if (!isAdmin) return;
+    setProfiles(prev => prev.map(profile => (
+      profile.id === id ? { ...profile, ...updates } : profile
+    )));
+    setSelectedProfile(prev => prev && prev.id === id ? { ...prev, ...updates } : prev);
+  };
+
+  const handleRemoveImage = (id: string, imageUrl: string) => {
+    if (!isAdmin) return;
+    setProfiles(prev => prev.map(profile => {
+      if (profile.id !== id) return profile;
+      const nextGallery = (profile.galleryImages || []).filter(img => img !== imageUrl);
+      const nextProfileImage = profile.profileImage === imageUrl
+        ? (nextGallery[0] || '')
+        : profile.profileImage;
+      return {
+        ...profile,
+        profileImage: nextProfileImage,
+        galleryImages: nextGallery
+      };
+    }));
+    setSelectedProfile(prev => {
+      if (!prev || prev.id !== id) return prev;
+      const nextGallery = (prev.galleryImages || []).filter(img => img !== imageUrl);
+      const nextProfileImage = prev.profileImage === imageUrl
+        ? (nextGallery[0] || '')
+        : prev.profileImage;
+      return {
+        ...prev,
+        profileImage: nextProfileImage,
+        galleryImages: nextGallery
+      };
+    });
   };
 
   return (
@@ -251,6 +287,8 @@ const App: React.FC = () => {
           onClose={() => setSelectedProfile(null)}
           onDelete={() => handleDelete(selectedProfile.id)}
           onAddImages={(files) => handleAddImages(selectedProfile.id, files)}
+          onUpdate={(updates) => handleUpdateProfile(selectedProfile.id, updates)}
+          onRemoveImage={(imageUrl) => handleRemoveImage(selectedProfile.id, imageUrl)}
         />
       )}
 
