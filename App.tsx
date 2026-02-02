@@ -8,9 +8,25 @@ import UploadModal from './components/UploadModal';
 import RankingLeaderboard from './components/RankingLeaderboard';
 import ProfileDetail from './components/ProfileDetail';
 import LoginModal from './components/LoginModal';
+import { supabase } from './services/supabaseClient';
 
-const LOCAL_STORAGE_KEY = 'vision_rank_profiles_v3';
 const ADMIN_STORAGE_KEY = 'vision_rank_admin_status';
+
+type DbProfile = {
+  id: string;
+  name: string;
+  country: string;
+  about: string;
+  category: string;
+  instagram?: string | null;
+  x?: string | null;
+  facebook?: string | null;
+  profile_image: string;
+  gallery_images: string[] | null;
+  views: number;
+  rank: number | null;
+  uploaded_at: string;
+};
 
 const App: React.FC = () => {
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -19,47 +35,46 @@ const App: React.FC = () => {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [hasLoaded, setHasLoaded] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved) as Profile[];
-        const normalized = parsed.map((profile) => ({
-          ...profile,
-          galleryImages: profile.galleryImages && profile.galleryImages.length > 0
-            ? profile.galleryImages
-            : profile.profileImage
-              ? [profile.profileImage]
-              : []
-        }));
-        setProfiles(normalized);
-      } catch (e) {
-        console.error("Failed to parse storage", e);
+    const loadProfiles = async () => {
+      setIsRefreshing(true);
+      const { data, error } = await supabase.from('profiles').select('*');
+      if (error) {
+        console.error('Failed to load profiles from Supabase', error);
+        setIsRefreshing(false);
+        return;
       }
-    }
+      const normalized = (data as DbProfile[]).map((profile) => ({
+        id: profile.id,
+        name: profile.name,
+        country: profile.country,
+        about: profile.about,
+        category: profile.category,
+        instagram: profile.instagram || undefined,
+        x: profile.x || undefined,
+        facebook: profile.facebook || undefined,
+        profileImage: profile.profile_image,
+        galleryImages: profile.gallery_images && profile.gallery_images.length > 0
+          ? profile.gallery_images
+          : profile.profile_image
+            ? [profile.profile_image]
+            : [],
+        views: profile.views ?? 0,
+        rank: profile.rank ?? 0,
+        uploadedAt: profile.uploaded_at ? new Date(profile.uploaded_at).getTime() : Date.now()
+      }));
+      setProfiles(normalized);
+      setIsRefreshing(false);
+    };
+
+    loadProfiles();
 
     const adminStatus = localStorage.getItem(ADMIN_STORAGE_KEY);
     if (adminStatus === 'true') {
       setIsAdmin(true);
     }
-    setHasLoaded(true);
   }, []);
-
-  useEffect(() => {
-    if (!hasLoaded) return;
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(profiles));
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-        console.warn('LocalStorage quota exceeded. Latest changes were not saved.');
-        alert('El almacenamiento del navegador está lleno. Reduce la cantidad de imágenes o su tamaño.');
-      } else {
-        console.error('Failed to save to localStorage', error);
-      }
-    }
-  }, [profiles, hasLoaded]);
 
   const handleAdminLogin = (password: string): boolean => {
     if (password === 'admin') {
@@ -95,7 +110,7 @@ const App: React.FC = () => {
     });
   };
 
-  const compressImage = async (file: File): Promise<string> => {
+  const compressImageToBlob = async (file: File): Promise<Blob> => {
     const dataUrl = await readFileAsDataURL(file);
     const img = new Image();
     const imageLoaded = new Promise<void>((resolve, reject) => {
@@ -118,9 +133,26 @@ const App: React.FC = () => {
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return dataUrl;
+    if (!ctx) return file;
     ctx.drawImage(img, 0, 0, width, height);
-    return canvas.toDataURL('image/jpeg', 0.78);
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((next) => resolve(next), 'image/jpeg', 0.78);
+    });
+    return blob || file;
+  };
+
+  const uploadImages = async (files: File[], profileId: string): Promise<string[]> => {
+    const uploads = await Promise.all(files.map(async (file) => {
+      const blob = await compressImageToBlob(file);
+      const filePath = `${profileId}/${crypto.randomUUID()}.jpg`;
+      const { error } = await supabase.storage.from('profiles').upload(filePath, blob, {
+        contentType: 'image/jpeg'
+      });
+      if (error) throw error;
+      const { data } = supabase.storage.from('profiles').getPublicUrl(filePath);
+      return data.publicUrl;
+    }));
+    return uploads;
   };
 
   const handleUpload = async (files: File[], details: { name: string; country: string; about: string; category: string; instagram?: string; x?: string; facebook?: string }) => {
@@ -128,41 +160,81 @@ const App: React.FC = () => {
     if (files.length === 0) return;
 
     setIsRefreshing(true);
-    const images = await Promise.all(files.map(compressImage));
-    const primaryImage = images[0];
-    
-    const newProfile: Profile = {
-      id: crypto.randomUUID(),
-      profileImage: primaryImage,
-      galleryImages: images,
-      name: details.name,
-      country: details.country,
-      about: details.about,
-      category: details.category,
-      instagram: details.instagram,
-      x: details.x,
-      facebook: details.facebook,
-      views: Math.floor(Math.random() * 20),
-      rank: profiles.length + 1,
-      uploadedAt: Date.now()
-    };
+    const profileId = crypto.randomUUID();
+    const uploadedAt = Date.now();
+    try {
+      const images = await uploadImages(files, profileId);
+      const primaryImage = images[0] || '';
+      const newProfile: Profile = {
+        id: profileId,
+        profileImage: primaryImage,
+        galleryImages: images,
+        name: details.name,
+        country: details.country,
+        about: details.about,
+        category: details.category,
+        instagram: details.instagram,
+        x: details.x,
+        facebook: details.facebook,
+        views: 0,
+        rank: profiles.length + 1,
+        uploadedAt
+      };
 
-    setProfiles(prev => [newProfile, ...prev]);
-    setIsRefreshing(false);
-    setIsUploadOpen(false);
+      const { error } = await supabase.from('profiles').insert({
+        id: profileId,
+        name: details.name,
+        country: details.country,
+        about: details.about,
+        category: details.category,
+        instagram: details.instagram || null,
+        x: details.x || null,
+        facebook: details.facebook || null,
+        profile_image: primaryImage,
+        gallery_images: images,
+        views: 0,
+        rank: profiles.length + 1,
+        uploaded_at: new Date(uploadedAt).toISOString()
+      });
+      if (error) throw error;
+
+      setProfiles(prev => [newProfile, ...prev]);
+      setIsUploadOpen(false);
+    } catch (error) {
+      console.error('Failed to upload profile', error);
+      alert('No se pudo guardar el perfil. Intenta nuevamente.');
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
-  const handleSelectProfile = (id: string) => {
+  const handleSelectProfile = async (id: string) => {
+    const current = profiles.find(p => p.id === id);
+    const nextViews = (current?.views ?? 0) + 1;
     setProfiles(prev => prev.map(p => 
-      p.id === id ? { ...p, views: p.views + 1 } : p
+      p.id === id ? { ...p, views: nextViews } : p
     ));
     const profile = rankedProfiles.find(p => p.id === id);
-    if (profile) setSelectedProfile(profile);
+    if (profile) setSelectedProfile({ ...profile, views: nextViews });
+    try {
+      const { error } = await supabase.from('profiles').update({ views: nextViews }).eq('id', id);
+      if (error) throw error;
+    } catch (error) {
+      console.error('Failed to update views', error);
+    }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!isAdmin) return;
     if (confirm("Permanently de-list this profile from the rankings?")) {
+      try {
+        const { error } = await supabase.from('profiles').delete().eq('id', id);
+        if (error) throw error;
+      } catch (error) {
+        console.error('Failed to delete profile', error);
+        alert('No se pudo borrar el perfil. Intenta nuevamente.');
+        return;
+      }
       setProfiles(prev => prev.filter(p => p.id !== id));
       setSelectedProfile(null);
     }
@@ -170,32 +242,70 @@ const App: React.FC = () => {
 
   const handleAddImages = async (id: string, files: File[]) => {
     if (!isAdmin || files.length === 0) return;
-    const images = await Promise.all(files.map(compressImage));
-    setProfiles(prev => prev.map(profile => {
-      if (profile.id !== id) return profile;
-      const nextGallery = [...(profile.galleryImages || []), ...images];
-      return {
-        ...profile,
-        profileImage: profile.profileImage || images[0],
+    try {
+      const images = await uploadImages(files, id);
+      let nextProfileImage = '';
+      let nextGallery: string[] = [];
+      setProfiles(prev => prev.map(profile => {
+        if (profile.id !== id) return profile;
+        nextGallery = [...(profile.galleryImages || []), ...images];
+        nextProfileImage = profile.profileImage || images[0] || '';
+        return {
+          ...profile,
+          profileImage: nextProfileImage,
+          galleryImages: nextGallery
+        };
+      }));
+      setSelectedProfile(prev => prev && prev.id === id ? {
+        ...prev,
+        profileImage: nextProfileImage,
         galleryImages: nextGallery
-      };
-    }));
+      } : prev);
+      const { error } = await supabase.from('profiles').update({
+        profile_image: nextProfileImage,
+        gallery_images: nextGallery
+      }).eq('id', id);
+      if (error) throw error;
+    } catch (error) {
+      console.error('Failed to add images', error);
+      alert('No se pudieron agregar las imágenes. Intenta nuevamente.');
+    }
   };
 
-  const handleUpdateProfile = (id: string, updates: Partial<Profile>) => {
+  const handleUpdateProfile = async (id: string, updates: Partial<Profile>) => {
     if (!isAdmin) return;
-    setProfiles(prev => prev.map(profile => (
-      profile.id === id ? { ...profile, ...updates } : profile
-    )));
-    setSelectedProfile(prev => prev && prev.id === id ? { ...prev, ...updates } : prev);
+    const dbUpdates: Record<string, unknown> = {};
+    if (updates.name !== undefined) dbUpdates.name = updates.name;
+    if (updates.country !== undefined) dbUpdates.country = updates.country;
+    if (updates.about !== undefined) dbUpdates.about = updates.about;
+    if (updates.category !== undefined) dbUpdates.category = updates.category;
+    if (updates.instagram !== undefined) dbUpdates.instagram = updates.instagram || null;
+    if (updates.x !== undefined) dbUpdates.x = updates.x || null;
+    if (updates.facebook !== undefined) dbUpdates.facebook = updates.facebook || null;
+    if (updates.profileImage !== undefined) dbUpdates.profile_image = updates.profileImage;
+    if (updates.galleryImages !== undefined) dbUpdates.gallery_images = updates.galleryImages;
+
+    try {
+      const { error } = await supabase.from('profiles').update(dbUpdates).eq('id', id);
+      if (error) throw error;
+      setProfiles(prev => prev.map(profile => (
+        profile.id === id ? { ...profile, ...updates } : profile
+      )));
+      setSelectedProfile(prev => prev && prev.id === id ? { ...prev, ...updates } : prev);
+    } catch (error) {
+      console.error('Failed to update profile', error);
+      alert('No se pudo actualizar el perfil. Intenta nuevamente.');
+    }
   };
 
-  const handleRemoveImage = (id: string, imageUrl: string) => {
+  const handleRemoveImage = async (id: string, imageUrl: string) => {
     if (!isAdmin) return;
+    let nextGallery: string[] = [];
+    let nextProfileImage = '';
     setProfiles(prev => prev.map(profile => {
       if (profile.id !== id) return profile;
-      const nextGallery = (profile.galleryImages || []).filter(img => img !== imageUrl);
-      const nextProfileImage = profile.profileImage === imageUrl
+      nextGallery = (profile.galleryImages || []).filter(img => img !== imageUrl);
+      nextProfileImage = profile.profileImage === imageUrl
         ? (nextGallery[0] || '')
         : profile.profileImage;
       return {
@@ -206,8 +316,8 @@ const App: React.FC = () => {
     }));
     setSelectedProfile(prev => {
       if (!prev || prev.id !== id) return prev;
-      const nextGallery = (prev.galleryImages || []).filter(img => img !== imageUrl);
-      const nextProfileImage = prev.profileImage === imageUrl
+      nextGallery = (prev.galleryImages || []).filter(img => img !== imageUrl);
+      nextProfileImage = prev.profileImage === imageUrl
         ? (nextGallery[0] || '')
         : prev.profileImage;
       return {
@@ -216,6 +326,16 @@ const App: React.FC = () => {
         galleryImages: nextGallery
       };
     });
+    try {
+      const { error } = await supabase.from('profiles').update({
+        profile_image: nextProfileImage,
+        gallery_images: nextGallery
+      }).eq('id', id);
+      if (error) throw error;
+    } catch (error) {
+      console.error('Failed to remove image', error);
+      alert('No se pudo actualizar las imágenes. Intenta nuevamente.');
+    }
   };
 
   return (
