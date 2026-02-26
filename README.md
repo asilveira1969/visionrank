@@ -1,4 +1,3 @@
-
 # VisionRank | High-End Curation Platform
 
 This project is now ready for **VS Code**.
@@ -11,14 +10,27 @@ This project is now ready for **VS Code**.
    npm install
    ```
 
-## 2. Running the Site
+## 2. Environment Variables (Required)
+Create a `.env` file in the project root and add:
+
+```env
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+## 3. Running the Site
 To see the site live on your computer, run:
 ```bash
 npm run dev
 ```
 Click the link it gives you (usually `http://localhost:5173`).
 
-## 3. Connecting to your GitHub
+## 4. Production Build
+```bash
+npm run build
+```
+
+## 5. Connecting to your GitHub
 Run these commands one by one in the VS Code terminal:
 ```bash
 git init
@@ -26,10 +38,4 @@ git remote add origin https://github.com/asilveira1969/visionrank.git
 git add .
 git commit -m "First upload from local VS Code"
 git push -u origin main
-```
-
-## 4. Setting up your API Key
-For the "Curator" AI to work on your local computer, create a file named `.env` in the root folder and add:
-```env
-API_KEY=your_actual_google_gemini_key
 ```
